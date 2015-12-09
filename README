@@ -1,0 +1,15 @@
+This project is used to backup the database or file-system on client machine.
+To use this project, we need to install the dependency on requirements.txt,
+Please follow the below command:
+pip install -r requirements.txt
+
+To deploy this project, we need to use cron to set the daily task schedule,
+Please follow the below format in crontab:
+0 1 * * * bash $PROJECT_DIR/db-back-agent.bash
+
+The $PROJECT_DIR is the project location.
+
+Any problem, please contact the maintainer Mei Lei <meil@rc.inesa.com>
+
+
+
