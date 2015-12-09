@@ -38,7 +38,7 @@ class Config(object):
             config_file = self.config_file
         else:
             config_file = os.environ.get('SWIFTCLIENT_CONFIG_FILE',
-                                     './swiftclient.conf')
+                                     './backup.conf')
         config = configparser.SafeConfigParser({'auth_version': '1'})
 	config.read(config_file)
         if config.has_section('swiftconf'):
@@ -84,6 +84,7 @@ def remove_expire_object(swiftclient,container_name,object_name):
 def upload_object(swiftclient,container_name,object_name):
     logger.info("Starting to upload the file: %s" % object_name)
     swiftclient.upload(container_name,object_name)
+    return True
 
 
 def send_mail(mail_type):
@@ -93,40 +94,23 @@ def send_mail(mail_type):
   #          Header(name, 'utf-8').encode(), \
   #          addr.encode('utf-8') if isinstance(addr, unicode) else addr))
     logger.info("Will send mail to admin!")
-    from_addr = "backup_notify"
+    from_addr = "backup_server"
     to_addr = admin_email
-    smtp_server = "smtp.rc.inesa.com"
-    if mail_type=="warning":
-        if flag == "rx":
-            msg = MIMEText('The neutron node %s qrouter: %s last 5 minutes average '
-                            'inbound traffic is %d KB ! The limitation is %d KB ! Please check it! \n '
-                            'If keep so huge trffic, router will shutdown in 10 minutes' % (local_ip,qrouter,average_value,max_bandwidth), 'plain', 'utf-8')
-        elif flag == "tx":
-            msg = MIMEText('The neutron node %s qrouter: %s last 5 minutes average '
-                            'outbound traffic is %d KB ! The limitation is %d KB ! Please check it! \n'
-                            'If keep so huge trffic, router will shutdown in 10 minutes' % (local_ip,qrouter,average_value,max_bandwidth), 'plain', 'utf-8')
-        msg['Subject'] = Header(u'Warning!!! Huge Traffic Detected!', 'utf-8').encode()
+    smtp_server = "localhost"
+    if mail_type=="successful":
+        msg = MIMEText('database %s backup successful!' %,'plain', 'utf-8' )
+        msg['Subject'] = Header(u'backup successful!', 'utf-8').encode()
 
-    if mail_type == "action":
-        if flag == "rx":
-            msg = MIMEText('The neutron node %s qrouter: %s last 15 minutes average '
-                            'inbound traffic is %d KB ! The port %s on this router will be shutdown immediately!\n '
-                            'Please contact the admin (meil@rc.inesa.com) to enable it when you kill the suspicious '
-                            'traffic! ' % (local_ip,qrouter,average_value,qg), 'plain', 'utf-8')
-        elif flag == "tx":
-            msg = MIMEText('The neutron node %s qrouter: %s last 15 minutes average '
-                            'outbound traffic is %d KB ! The port %s on this router will be shutdown immediately!\n '
-                            'Please contact the admin (meil@rc.inesa.com) to enable it when you kill the suspicious '
-                            'traffic! ' % (local_ip,qrouter,average_value,qg), 'plain', 'utf-8')
-        msg['Subject'] = Header(u'Warning!!! The qrouter %s has been disabled!' % (qrouter), 'utf-8').encode()
+    if mail_type == "error":
+        msg = MIMEText('database %s backup failed!' % ,'plain', 'utf-8' )
+        msg['Subject'] = Header(u'backup failed!', 'utf-8').encode()
 
 
     msg['From'] =  from_addr
     msg['To'] =  to_addr
 
-    server = smtplib.SMTP(smtp_server, 25)
+    server = smtplib.SMTP(smtp_server)
     server.set_debuglevel(1)
-    server.login(from_addr, password)
     server.sendmail(from_addr, [to_addr], msg.as_string())
     logger.info("send mail finished")
     server.quit()
@@ -156,7 +140,11 @@ def main():
 
     remove_expire_object(conn,container_mysql,expire_mysql_name)
 
-    upload_object(conn,container_mysql,backup_mysql_name)
+    upload_result = upload_object(conn,container_mysql,backup_mysql_name)
+    if upload_result == "True":
+        send_mail("successful")
+    else:
+        send_mail("error")
     
 if __name__ == "__main__":
    main()
