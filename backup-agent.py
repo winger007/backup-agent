@@ -14,11 +14,6 @@ from email.utils import parseaddr, formataddr
 import smtplib
 import pdb
 
-backup_mysql_name = sys.argv[1]
-expire_mysql_name = sys.argv[2]
-admin_email = sys.argv[3]
-    
-
 logger = None
 # Setup global logger
 logger_dir=os.getcwd() + "/log/"
@@ -60,6 +55,13 @@ class Config(object):
             if self.auth_version == "1":
                 self.auth_url += 'v1.0'
             self.account_username = "%s:%s" % (self.account, self.username)
+        if config.has_section('agentconf'):
+            self.db_username = config.get('agentconf','DB_USERNAME')
+            self.db_passwd = config.get('agentconf','DB_PASSWD')
+            self.db_name = config.get('agentconf','DB_NAME')
+            self.db_expire_days = config.get('agentconf','DB_EXPIRE_DAYS')
+            self.db_backup_dir = config.get('agentconf','BACK_DIR')
+            self.admin_email = config.get('agentconf','ADMIN_EMAIL')
 
 def create_timed_rotating_log(logfile):
     """"""
@@ -76,33 +78,55 @@ def create_timed_rotating_log(logfile):
     if not logger.handlers:
         logger.addHandler(handler)
 
+def backup_mysql(db_username,db_passwd,db_name,db_backup_dir,db_backup_name):
+    (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s %s > %s/%s " % (db_username,db_passwd,db_name,db_backup_dir,db_backup_name))
+    logger.debug(output)
+    if status == 0:
+        logger.info("Backup db: %s successful!" % db_backup_name)
+        return True
+    else:
+        logger.error("BAckup db: %s error!" % db_backup_name)
+        return False
+
+def caculate_expire_date(current_time, deltadays):
+    expire_time = current_time - datetime.timedelta(days=int(deltadays))
+    expire_date = expire_time.strftime("%Y-%m-%d")
+    logger.debug("expire date is %s " % expire_date)
+    return expire_date 
+    
+
 def remove_expire_object(swiftclient,container_name,object_name):
     logger.info("Starting to remove the expire object : %s" % object_name)
-    swiftclient.delete_object(object_name)
-
-
-def upload_object(swiftclient,container_name,object_name):
-    logger.info("Starting to upload the file: %s" % object_name)
-    swiftclient.upload(container_name,object_name)
+    try:
+        swiftclient.delete_object(container_name,object_name)
+    except:
+        logger.error("No object: %s found in container %s" % (object_name,container_name))
     return True
 
 
-def send_mail(mail_type):
+def upload_object(conn,container_name,object_name,object_path):
+    logger.info("Starting to upload the file: %s" % object_name)
+    db_content = open(object_path + object_name)
+    conn.put_object(container_name,object_name,contents=db_content)
+    return True
+
+
+def send_mail(mail_type,admin_email,object_name):
   #  def _format_addr(s):
   #      name, addr = parseaddr(s)
   #      return formataddr(( \
   #          Header(name, 'utf-8').encode(), \
   #          addr.encode('utf-8') if isinstance(addr, unicode) else addr))
     logger.info("Will send mail to admin!")
-    from_addr = "backup_server"
+    from_addr = "backup_server@rc.inesa.com"
     to_addr = admin_email
     smtp_server = "localhost"
     if mail_type=="successful":
-        msg = MIMEText('database %s backup successful!' %,'plain', 'utf-8' )
+        msg = MIMEText('database %s backup successful!' % object_name,'plain', 'utf-8' )
         msg['Subject'] = Header(u'backup successful!', 'utf-8').encode()
 
     if mail_type == "error":
-        msg = MIMEText('database %s backup failed!' % ,'plain', 'utf-8' )
+        msg = MIMEText('database %s backup failed!' % object_name ,'plain', 'utf-8' )
         msg['Subject'] = Header(u'backup failed!', 'utf-8').encode()
 
 
@@ -115,36 +139,42 @@ def send_mail(mail_type):
     logger.info("send mail finished")
     server.quit()
 
-
-
 def main():
-	conf = Config()
-	logfile= logger_dir + "swiftclient.log"
-	print logfile
-    	create_timed_rotating_log(logfile)
-        conn = swiftclient.Connection(conf.auth_url,
-                                      conf.account_username,
-                                      conf.password,
-                                      auth_version=conf.auth_version)
-	logger.info("The swifclient object is %s" % conn)
+    conf = Config()
+    logfile= logger_dir + "backup.log"
+    create_timed_rotating_log(logfile)
+    current_time = datetime.datetime.now()
+    backup_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    expire_date = caculate_expire_date(current_time,conf.db_expire_days)
 
-        # check if container exists, create one if not
-        try:
-            head_container = conn.head_container(conf.container_mysql)
-            logger.info('head container: %s' % json.dumps(head_container,
-                sort_keys=True, indent=4))
-        except:
-            logger.debug('container not exists or swift connection fail...')
-            conn.put_container(conf.container_mysql)
-            logger.debug('created container...')
+    #create connection to swift
+    conn = swiftclient.Connection(conf.auth_url,
+                                  conf.account_username,
+                                  conf.password,
+                                  auth_version=conf.auth_version)
+    logger.info("The swifclient object is %s" % conn)
+    #pdb.set_trace()
 
-    remove_expire_object(conn,container_mysql,expire_mysql_name)
-
-    upload_result = upload_object(conn,container_mysql,backup_mysql_name)
-    if upload_result == "True":
-        send_mail("successful")
+    # check if container exists, create one if not
+    try:
+        head_container = conn.head_container(conf.container_mysql)
+        logger.debug('head container: %s' % json.dumps(head_container,
+            sort_keys=True, indent=4))
+    except:
+        logger.info('container not exists or swift connection fail...')
+        conn.put_container(conf.container_mysql)
+        logger.info('created container...')
+    #backup database
+    db_backup_name = conf.db_name + "-" + backup_date
+    backup_result = backup_mysql(conf.db_username,conf.db_passwd,conf.db_name,conf.db_backup_dir,db_backup_name)
+    expire_mysql_name = conf.db_backup_dir + "/" + conf.db_name + "-" +  expire_date
+    logger.debug("The expire_mysql_name is %s " % expire_mysql_name)
+    if backup_result == True:
+        remove_expire_object(conn,conf.container_mysql,expire_mysql_name)
+        upload_result = upload_object(conn,conf.container_mysql,db_backup_name,conf.db_backup_dir)
+        send_mail("successful",conf.admin_email,db_backup_name)
     else:
-        send_mail("error")
+        send_mail("error",conf.admin_email,db_backup_name)
     
 if __name__ == "__main__":
    main()
