@@ -45,7 +45,7 @@ class Config(object):
             self.account = config.get('swiftconf', 'account')
             self.username = config.get('swiftconf', 'username')
             self.password = config.get('swiftconf', 'password')
-            self.container_mysql = config.get('swiftconf', 'container_mysql')
+            self.container_mysql = config.get('swiftconf', 'container_name')
             self.auth_url = ""
             if auth_ssl:
                 self.auth_url += "https://"
