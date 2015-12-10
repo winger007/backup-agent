@@ -104,9 +104,9 @@ def remove_expire_object(swiftclient,container_name,object_name):
     return True
 
 
-def upload_object(conn,container_name,object_name,object_path):
+def upload_object(conn,container_name,object_name):
     logger.info("Starting to upload the file: %s" % object_name)
-    db_content = open(object_path + object_name)
+    db_content = open(object_name)
     conn.put_object(container_name,object_name,contents=db_content)
     return True
 
@@ -166,12 +166,15 @@ def main():
         logger.info('created container...')
     #backup database
     db_backup_name = conf.db_name + "-" + backup_date
+    full_db_backup_name = conf.db_backup_dir + "/" + db_backup_name
     backup_result = backup_mysql(conf.db_username,conf.db_passwd,conf.db_name,conf.db_backup_dir,db_backup_name)
-    expire_mysql_name = conf.db_backup_dir + "/" + conf.db_name + "-" +  expire_date
-    logger.debug("The expire_mysql_name is %s " % expire_mysql_name)
+    compress_db_name = full_db_backup_name +".tar.gz"
+    (status,output) = commands.getstatusoutput("tar czf %s %s" % (compress_db_name,full_db_backup_name))
+    expire_db_name = conf.db_name + "-" + expire_date + ".tar.gz"
+    logger.debug("The expire_mysql_name is %s " % expire_db_name)
     if backup_result == True:
-        remove_expire_object(conn,conf.container_mysql,expire_mysql_name)
-        upload_result = upload_object(conn,conf.container_mysql,db_backup_name,conf.db_backup_dir)
+        remove_expire_object(conn,conf.container_mysql,expire_db_name)
+        upload_result = upload_object(conn,conf.container_mysql,compress_db_name)
         send_mail("successful",conf.admin_email,db_backup_name)
     else:
         send_mail("error",conf.admin_email,db_backup_name)
