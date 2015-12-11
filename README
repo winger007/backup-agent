@@ -1,5 +1,5 @@
 This tool is used to backup the database or file-system on client machine.
-To use this tool, we need to install the dependency on requirements.txt,
+To use this tool, we need to install the dependency described in requirements.txt,
 Please follow the below command:
 pip install -r requirements.txt
 

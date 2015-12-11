@@ -175,7 +175,7 @@ def main():
         logger.debug("The db_backup_name is %s " % compress_db_name)
         backup_result = backup_mysql(conf.db_username,conf.db_passwd,db_name,conf.db_backup_dir,db_backup_name)
         logger.info("Compress backup database: %s !" % compress_db_name)
-        (status,output) = commands.getstatusoutput("tar czf %s %s" % (full_db_backup_name+"tar.gz",full_db_backup_name))
+        (status,output) = commands.getstatusoutput("tar czf %s %s" % (full_db_backup_name+".tar.gz",full_db_backup_name))
         if status == 0:
             logger.info("Delete local backup db %s due to already compress it!" % full_db_backup_name)
             (status,output) = commands.getstatusoutput("rm -f %s" % full_db_backup_name)
@@ -186,7 +186,7 @@ def main():
             logger.info("Remove local compress expire db %s " % full_compress_expire_db_name)
             (status,output) = commands.getstatusoutput("rm -f  %s " % full_compress_expire_db_name)
             remove_expire_object(conn,conf.container_mysql,compress_expire_db_name)
-            compress_db_content=open(full_db_backup_name+"tar.gz")
+            compress_db_content=open(full_db_backup_name+".tar.gz")
             upload_object(conn,conf.container_mysql,compress_db_name,compress_db_content)
             compress_db_content.close()
             send_mail("successful",conf.admin_email,db_backup_name)
