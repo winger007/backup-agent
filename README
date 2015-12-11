@@ -7,6 +7,7 @@ To deploy this project, we need to use cron to set the daily task schedule,
 Please follow the below format in crontab:
 0 1 * * * python $PROJECT_DIR/backup-agent.py
 
+You just need to use crontab -e to fill in above content.
 The $PROJECT_DIR is the tool location.
 
-Any problem, please contact the maintainer Mei Lei <meil@rc.inesa.com>
+Any problem, please contact Mei Lei <meil@rc.inesa.com>

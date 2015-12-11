@@ -8,6 +8,7 @@ import datetime
 import time
 import logging
 from logging.handlers import TimedRotatingFileHandler
+from tempfile import TemporaryFile
 from email import encoders
 from email.header import Header
 from email.mime.text import MIMEText
@@ -15,6 +16,7 @@ from email.utils import parseaddr, formataddr
 import smtplib
 import pdb
 
+mail_content = TemporaryFile()
 logger = None
 # Setup global logger
 logger_dir=os.getcwd() + "/log/"
@@ -118,29 +120,31 @@ def upload_object(conn,container_name,object_name,object_content):
         logger.error("Upload object %s to container %s failed!" %(object_name.container_name))
         return False
 
+def generate_mail(status,database_name):
+    global mail_content
+    if status == "successful":
+        mail_content.write("The database %s backup successful!" % database_name,'utf-8')
+    elif status == "error":
+        mail_content.write("The database %s backup failed!" % database_name,'utf-8')
+    
 
-def send_mail(mail_type,admin_email,object_name):
+def send_mail(admin_email,backup_date):
+    global mail_content
     logger.info("Will send mail to admin!")
     from_addr = "backup_server@rc.inesa.com"
     to_addr = admin_email
     smtp_server = "localhost"
-    if mail_type=="successful":
-        msg = MIMEText('Database %s backup successful!' % object_name,'plain', 'utf-8' )
-        msg['Subject'] = Header(u'backup for %s successful!' % object_name, 'utf-8').encode()
-
-    if mail_type == "error":
-        msg = MIMEText('database %s backup failed!' % object_name ,'plain', 'utf-8' )
-        msg['Subject'] = Header(u'backup for %s failed!' % object_name, 'utf-8').encode()
-
-
+    mail_content.seek(0)
+    msg = MIMEText(mail_content.read(),'plain', 'utf-8' )
+    msg['Subject'] = Header(u'Backup result of %s' % backup_date, 'utf-8').encode()
     msg['From'] =  from_addr
     msg['To'] =  to_addr
-
     server = smtplib.SMTP(smtp_server)
     server.set_debuglevel(1)
     server.sendmail(from_addr, [to_addr], msg.as_string())
     logger.info("send mail finished")
     server.quit()
+    mail_content.closed
 
 def main():
     conf = Config()
@@ -189,9 +193,11 @@ def main():
             compress_db_content=open(full_db_backup_name+".tar.gz")
             upload_object(conn,conf.container_mysql,compress_db_name,compress_db_content)
             compress_db_content.close()
-            send_mail("successful",conf.admin_email,db_backup_name)
+            generate_mail("successful",db_backup_name)
         else:
-            send_mail("error",conf.admin_email,db_backup_name)
+            generate_mail("error",db_backup_name)
+
+    send_mail(conf.admin_email,backup_date)
     
 if __name__ == "__main__":
    main()
