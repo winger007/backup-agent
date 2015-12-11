@@ -151,6 +151,12 @@ def main():
     logfile= logger_dir + "backup.log"
     create_timed_rotating_log(logfile)
     conf = Config()
+    try:
+        if not os.path.exists(conf.db_backup_dir):
+            os.makedirs(conf.db_backup_dir)
+    except Exception as e:
+        logger.error("Can not create dir: %s. The exception is %s" % (conf.db_backup_dir,e))
+        sys.exit(1)
     logger.info("Starting to backup!")
     current_time = datetime.datetime.now()
     backup_date = datetime.datetime.now().strftime("%Y-%m-%d")
