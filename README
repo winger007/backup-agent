@@ -1,13 +1,20 @@
 This tool is used to backup the database or file-system on client machine.
 To use this tool, we need to install the dependency described in requirements.txt,
 Please follow the below command:
-pip install -r requirements.txt
+1.   pip install -r requirements.txt
 
 To deploy this project, we need to use cron to set the daily task schedule,
-Please follow the below format in crontab:
-0 1 * * * python $PROJECT_DIR/backup-agent.py
-
-You just need to use crontab -e to fill in above content.
+2. Use crontab -e to fill in above content.
+-------------------------------------------------
+|0 1 * * * python $PROJECT_DIR/backup-agent.py   |
+-------------------------------------------------
 The $PROJECT_DIR is the tool location.
+
+3. Finally, fill in the backup.conf for any database or file-system you want to backup.
+
+4. Test whether the module can run normally manually
+--------------------------------------
+| python $PROJECT_DIR/backup-agent.py |
+--------------------------------------
 
 Any problem, please contact Mei Lei <meil@rc.inesa.com>

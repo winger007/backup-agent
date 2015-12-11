@@ -38,7 +38,7 @@ class Config(object):
             config_file = os.environ.get('SWIFTCLIENT_CONFIG_FILE',
                                      './backup.conf')
         config = configparser.SafeConfigParser({'auth_version': '1'})
-	config.read(config_file)
+        config.read(config_file)
         if config.has_section('swiftconf'):
             auth_host = config.get('swiftconf', 'auth_host')
             auth_port = config.getint('swiftconf', 'auth_port')
@@ -70,7 +70,7 @@ def create_timed_rotating_log(logfile):
     """"""
     global logger
     logger = logging.getLogger("Rotating Log")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     fmt = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
     handler = TimedRotatingFileHandler(logfile,
@@ -123,9 +123,9 @@ def upload_object(conn,container_name,object_name,object_content):
 def generate_mail(status,database_name):
     global mail_content
     if status == "successful":
-        mail_content.write("The database %s backup successful!" % database_name,'utf-8')
+        mail_content.write("The database %s backup successful!\n" % database_name)
     elif status == "error":
-        mail_content.write("The database %s backup failed!" % database_name,'utf-8')
+        mail_content.write("The database %s backup failed!\n" % database_name)
     
 
 def send_mail(admin_email,backup_date):
@@ -134,6 +134,7 @@ def send_mail(admin_email,backup_date):
     from_addr = "backup_server@rc.inesa.com"
     to_addr = admin_email
     smtp_server = "localhost"
+    mail_content.write("You can get the backup files on http://210.14.69.69/dashboard/project/containers/")
     mail_content.seek(0)
     msg = MIMEText(mail_content.read(),'plain', 'utf-8' )
     msg['Subject'] = Header(u'Backup result of %s' % backup_date, 'utf-8').encode()
@@ -144,12 +145,13 @@ def send_mail(admin_email,backup_date):
     server.sendmail(from_addr, [to_addr], msg.as_string())
     logger.info("send mail finished")
     server.quit()
-    mail_content.closed
 
 def main():
-    conf = Config()
+    global mail_content
     logfile= logger_dir + "backup.log"
     create_timed_rotating_log(logfile)
+    conf = Config()
+    logger.info("Starting to backup!")
     current_time = datetime.datetime.now()
     backup_date = datetime.datetime.now().strftime("%Y-%m-%d")
     expire_date = caculate_expire_date(current_time,conf.db_expire_days)
@@ -198,6 +200,7 @@ def main():
             generate_mail("error",db_backup_name)
 
     send_mail(conf.admin_email,backup_date)
+    mail_content.closed
     
 if __name__ == "__main__":
    main()
