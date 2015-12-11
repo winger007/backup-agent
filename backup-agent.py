@@ -1,5 +1,6 @@
 #!/bin/python
 import swiftclient
+import json
 from swiftclient import ClientException
 from six.moves import configparser
 import os,sys,commands
@@ -79,7 +80,8 @@ def create_timed_rotating_log(logfile):
         logger.addHandler(handler)
 
 def backup_mysql(db_username,db_passwd,db_name,db_backup_dir,db_backup_name):
-    (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s %s > %s/%s " % (db_username,db_passwd,db_name,db_backup_dir,db_backup_name))
+    (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s "
+                "%s > %s/%s " % (db_username,db_passwd,db_name,db_backup_dir,db_backup_name))
     logger.debug(output)
     if status == 0:
         logger.info("Backup db: %s successful!" % db_backup_name)
@@ -95,21 +97,22 @@ def caculate_expire_date(current_time, deltadays):
     return expire_date 
     
 
-def remove_expire_object(swiftclient,container_name,object_name):
+def remove_expire_object(conn,container_name,object_name):
     logger.info("Starting to remove the expire object : %s on cloud" % object_name)
     try:
-        swiftclient.delete_object(container_name,object_name)
+        conn.delete_object(container_name,object_name)
+        logger.info("Delete object %s on container %s successful!" % (object_name,container_name))
         return True
-    except:
-        logger.error("No object: %s found in container %s" % (object_name,container_name))
+    except Exception as e :
+        logger.error("No object: %s found in container %s !!! %s" % (object_name,container_name,e))
         return False
 
 
-def upload_object(conn,container_name,object_name):
+def upload_object(conn,container_name,object_name,object_content):
     logger.info("Starting to upload the object: %s" % object_name)
-    db_content = open(object_name)
     try:
-        conn.put_object(container_name,object_name,contents=db_content)
+        conn.put_object(container_name,object_name,contents=object_content)
+        logger.info("Upload object %s on container %s successful!" % (object_name,container_name))
         return True
     except:
         logger.error("Upload object %s to container %s failed!" %(object_name.container_name))
@@ -117,11 +120,6 @@ def upload_object(conn,container_name,object_name):
 
 
 def send_mail(mail_type,admin_email,object_name):
-  #  def _format_addr(s):
-  #      name, addr = parseaddr(s)
-  #      return formataddr(( \
-  #          Header(name, 'utf-8').encode(), \
-  #          addr.encode('utf-8') if isinstance(addr, unicode) else addr))
     logger.info("Will send mail to admin!")
     from_addr = "backup_server@rc.inesa.com"
     to_addr = admin_email
@@ -158,40 +156,42 @@ def main():
                                   conf.password,
                                   auth_version=conf.auth_version)
     logger.info("The swifclient object is %s" % conn)
-    #pdb.set_trace()
 
     # check if container exists, create one if not
     try:
         head_container = conn.head_container(conf.container_mysql)
-        logger.debug('head container: %s' % json.dumps(head_container,
-            sort_keys=True, indent=4))
-    except:
-        logger.info('container not exists or swift connection fail...')
+        logger.debug('head container: %s' % json.dumps(head_container, sort_keys=True, indent=4))
+    except Exception as e:
+        logger.info('container not exists or swift connection fail... %s' % e)
         conn.put_container(conf.container_mysql)
         logger.info('created container...')
     #backup database
-    db_backup_name = conf.db_name + "-" + backup_date
-    pdb.set_trace()
-    full_db_backup_name = conf.db_backup_dir + "/" + db_backup_name
-    compress_db_name = full_db_backup_name +".tar.gz"
-    logger.debug("The db_backup_name is %s " % compress_db_name)
-    backup_result = backup_mysql(conf.db_username,conf.db_passwd,conf.db_name,conf.db_backup_dir,db_backup_name)
-    logger.info("Compress backup db to %s !" % compress_db_name)
-    (status,output) = commands.getstatusoutput("tar czf %s %s" % (compress_db_name,full_db_backup_name))
-    if status == 0:
-        logger.info("Delete local backup db %s due to already compress it!" % full_db_backup_name)
-        (status,output) = commands.getstatusoutput("rm -f %s" % full_db_backup_name)
-    compress_expire_db_name = conf.db_name + "-" + expire_date + ".tar.gz"
-    full_compress_expire_db_name = conf.db_backup_dir + compress_expire_db_name
-    logger.debug("The full_compress_expire_db_name is %s " % compress_expire_db_name)
-    if backup_result == True:
-        logger.info("Remove local compress expire db %s " % full_compress_expire_db_name)
-        (status,output) = commands.getstatusoutput("rm -f  %s " % full_compress_expire_db_name)
-        remove_expire_object(conn,conf.container_mysql,compress_expire_db_name)
-        upload_result = upload_object(conn,conf.container_mysql,compress_db_name)
-        send_mail("successful",conf.admin_email,db_backup_name)
-    else:
-        send_mail("error",conf.admin_email,db_backup_name)
+    db_name_list = conf.db_name.split(',')
+    for db_name in db_name_list:
+        logger.info("Starting to backup database: %s" % db_name)
+        db_backup_name = db_name + "-" + backup_date
+        full_db_backup_name = conf.db_backup_dir + db_backup_name
+        compress_db_name = db_backup_name +".tar.gz"
+        logger.debug("The db_backup_name is %s " % compress_db_name)
+        backup_result = backup_mysql(conf.db_username,conf.db_passwd,db_name,conf.db_backup_dir,db_backup_name)
+        logger.info("Compress backup database: %s !" % compress_db_name)
+        (status,output) = commands.getstatusoutput("tar czf %s %s" % (full_db_backup_name+"tar.gz",full_db_backup_name))
+        if status == 0:
+            logger.info("Delete local backup db %s due to already compress it!" % full_db_backup_name)
+            (status,output) = commands.getstatusoutput("rm -f %s" % full_db_backup_name)
+        compress_expire_db_name = db_name + "-" + expire_date + ".tar.gz"
+        full_compress_expire_db_name = conf.db_backup_dir + compress_expire_db_name
+        logger.debug("The full_compress_expire_db_name is %s " % full_compress_expire_db_name)
+        if backup_result == True:
+            logger.info("Remove local compress expire db %s " % full_compress_expire_db_name)
+            (status,output) = commands.getstatusoutput("rm -f  %s " % full_compress_expire_db_name)
+            remove_expire_object(conn,conf.container_mysql,compress_expire_db_name)
+            compress_db_content=open(full_db_backup_name+"tar.gz")
+            upload_object(conn,conf.container_mysql,compress_db_name,compress_db_content)
+            compress_db_content.close()
+            send_mail("successful",conf.admin_email,db_backup_name)
+        else:
+            send_mail("error",conf.admin_email,db_backup_name)
     
 if __name__ == "__main__":
    main()
