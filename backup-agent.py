@@ -36,7 +36,7 @@ class Config(object):
             config_file = self.config_file
         else:
             config_file = os.environ.get('SWIFTCLIENT_CONFIG_FILE',
-                                     './backup.conf')
+                                     './conf/backup.conf')
         config = configparser.SafeConfigParser({'auth_version': '1'})
         config.read(config_file)
         if config.has_section('swiftconf'):
@@ -65,6 +65,10 @@ class Config(object):
             self.db_expire_days = config.get('agentconf','DB_EXPIRE_DAYS')
             self.db_backup_dir = config.get('agentconf','BACK_DIR')
             self.admin_email = config.get('agentconf','ADMIN_EMAIL')
+            self.db_local_expire_days = config.get('agentconf','DB_LOCAL_EXPIRE_DAYS')
+            self.db_host= config.get('agentconf','DB_HOST')
+            if self.db_host== "":
+                self.db_host= "127.0.0.1"
 
 def create_timed_rotating_log(logfile):
     """"""
@@ -81,9 +85,9 @@ def create_timed_rotating_log(logfile):
     if not logger.handlers:
         logger.addHandler(handler)
 
-def backup_mysql(db_username,db_passwd,db_name,db_backup_dir,db_backup_name):
-    (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s "
-                "%s > %s/%s " % (db_username,db_passwd,db_name,db_backup_dir,db_backup_name))
+def backup_mysql(db_username,db_passwd,db_host,db_name,db_backup_dir,db_backup_name):
+    (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s -h%s "
+                "%s > %s/%s " % (db_username,db_passwd,db_host,db_name,db_backup_dir,db_backup_name))
     logger.debug(output)
     if status == 0:
         logger.info("Backup db: %s successful!" % db_backup_name)
@@ -161,6 +165,7 @@ def main():
     current_time = datetime.datetime.now()
     backup_date = datetime.datetime.now().strftime("%Y-%m-%d")
     expire_date = caculate_expire_date(current_time,conf.db_expire_days)
+    local_expire_date = caculate_expire_date(current_time,conf.db_local_expire_days)
 
     #create connection to swift
     conn = swiftclient.Connection(conf.auth_url,
@@ -185,18 +190,18 @@ def main():
         full_db_backup_name = conf.db_backup_dir + db_backup_name
         compress_db_name = db_backup_name +".tar.gz"
         logger.debug("The db_backup_name is %s " % compress_db_name)
-        backup_result = backup_mysql(conf.db_username,conf.db_passwd,db_name,conf.db_backup_dir,db_backup_name)
+        backup_result = backup_mysql(conf.db_username,conf.db_passwd,conf.db_host,db_name,conf.db_backup_dir,db_backup_name)
         logger.info("Compress backup database: %s !" % compress_db_name)
         (status,output) = commands.getstatusoutput("tar czf %s %s" % (full_db_backup_name+".tar.gz",full_db_backup_name))
         if status == 0:
             logger.info("Delete local backup db %s due to already compress it!" % full_db_backup_name)
             (status,output) = commands.getstatusoutput("rm -f %s" % full_db_backup_name)
         compress_expire_db_name = db_name + "-" + expire_date + ".tar.gz"
-        full_compress_expire_db_name = conf.db_backup_dir + compress_expire_db_name
-        logger.debug("The full_compress_expire_db_name is %s " % full_compress_expire_db_name)
+        full_local_compress_expire_db_name = conf.db_backup_dir + db_name + "-" + local_expire_date+ ".tar.gz" 
+        logger.debug("The full_local_compress_expire_db_name is %s " % full_local_compress_expire_db_name)
         if backup_result == True:
-            logger.info("Remove local compress expire db %s " % full_compress_expire_db_name)
-            (status,output) = commands.getstatusoutput("rm -f  %s " % full_compress_expire_db_name)
+            logger.info("Remove local compress expire db %s " % full_local_compress_expire_db_name)
+            (status,output) = commands.getstatusoutput("rm -f  %s " % full_local_compress_expire_db_name)
             remove_expire_object(conn,conf.container_mysql,compress_expire_db_name)
             compress_db_content=open(full_db_backup_name+".tar.gz")
             upload_object(conn,conf.container_mysql,compress_db_name,compress_db_content)

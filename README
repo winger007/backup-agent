@@ -1,29 +1,21 @@
 This tool is used to backup the database or file-system on client machine.
 To use this tool, we need to install the dependency package firstly(Use centos as example):
 
-1. Install system package
--------------------------------------------
-| yum install -y python-pip               |    
-| yum install -y gcc-c++.x86_64 gcc.x86_64|
-| yum install -y python-devel             | 
-------------------------------------------
-
-
-2. Install python package  
----------------------------------
-| pip install -r requirements.txt|
----------------------------------
-
+1. Run install script:
+-----------------------
+|bash install.bash     |      
+-----------------------
 To deploy this project, we need to use cron to set the daily task schedule,
-3. Use crontab -e to fill in above content.
+2. Use "crontab -e" to fill in below content.Below config means you want to backup the database
+   at 1:00 every night.
 -------------------------------------------------
 |0 1 * * * python $PROJECT_DIR/backup-agent.py   |
 -------------------------------------------------
 The $PROJECT_DIR is the tool location.
 
-4. Finally, fill in the backup.conf for any database or file-system you want to backup.
+3. Finally, fill in the backup.conf for any database or file-system you want to backup.
 
-5. Test whether the module can run normally manually
+4. Test whether the module can run normally manually
 --------------------------------------
 | python $PROJECT_DIR/backup-agent.py |
 --------------------------------------
