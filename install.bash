@@ -20,14 +20,12 @@ function install_package {
         $1 install -y patch
         $1 install -y gcc-c++.x86_64 gcc.x86_64
         $1 install -y python-devel
-        $1 install -y mysql
         pip install -r requirements.txt
     elif [[ $1 == "apt-get" ]];then
         $1 install -y python-pip
         $1 install -y patch
         $1 install -y gcc
         $1 install -y python-dev
-        $1 install -y mysql
         pip install -r requirements.txt
     fi
 }
