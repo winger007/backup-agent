@@ -86,9 +86,14 @@ def create_timed_rotating_log(logfile):
         logger.addHandler(handler)
 
 def backup_mysql(db_username,db_passwd,db_host,db_name,db_backup_dir,db_backup_name):
-    (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s -h%s "
-                "%s > %s/%s " % (db_username,db_passwd,db_host,db_name,db_backup_dir,db_backup_name))
-    logger.debug(output)
+    if db_host == "127.0.0.1":
+        (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s "
+                    "%s > %s/%s " % (db_username,db_passwd,db_name,db_backup_dir,db_backup_name))
+        logger.debug(output)
+    else:
+        (status,output) = commands.getstatusoutput("mysqldump -u%s -p%s -h%s "
+                    "%s > %s/%s " % (db_username,db_passwd,db_host,db_name,db_backup_dir,db_backup_name))
+        logger.debug(output)
     if status == 0:
         logger.info("Backup db: %s successful!" % db_backup_name)
         return True
