@@ -156,7 +156,7 @@ PYV=`python -c "import sys;t='{v[0]}.{v[1]}'.format(v=list(sys.version_info[:2])
 if [[ $PYV == "2.6"  ]];then
     echo "Will add one module to python library"
     cp $current_dir/patch/functools.diff   /usr/lib/python2.6/
-    cp $current_dir/patch/functools.diff  /usr/lib/python2.6/
+    cp $current_dir/patch/functools.diff  /usr/lib64/python2.6/
     cd  /usr/lib64/python2.6/
     patch -p1 < functools.diff
     cd /usr/lib/python2.6/
