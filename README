@@ -1,5 +1,4 @@
 This tool is used to backup the database or file-system on client machine.
-To use this tool, we need to install the dependency package firstly(Use centos as example):
 
 1. Run install script:
 -----------------------

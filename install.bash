@@ -1,13 +1,35 @@
 #!/bin/bash
+#
+# This script used to install backup agent dependency on client machine.
+#
+#/***************************************************************************
+# * This software is licensed as described in the file COPYING, which
+# * you should have received as part of this distribution.
+# *
+# * You may opt to use, copy, modify, merge, publish, distribute and/or sell
+# * copies of the Software, and permit persons to whom the Software is
+# * furnished to do so, under the terms of the COPYING file.
+# *
+# ***************************************************************************/
 
 export current_dir=$(cd `dirname $0` && pwd)
 
 function install_package {
-    $1 install -y python-pip                
-    $1 install -y patch                     
-    $1 install -y gcc-c++.x86_64 gcc.x86_64
-    $1 install -y python-devel
-    pip install -r requirements.txt
+    if [[ $1 == "yum" ]];then
+        $1 install -y python-pip
+        $1 install -y patch
+        $1 install -y gcc-c++.x86_64 gcc.x86_64
+        $1 install -y python-devel
+        $1 install -y mysql
+        pip install -r requirements.txt
+    elif [[ $1 == "apt-get" ]];then
+        $1 install -y python-pip
+        $1 install -y patch
+        $1 install -y gcc
+        $1 install -y python-dev
+        $1 install -y mysql
+        pip install -r requirements.txt
+    fi
 }
 
 # GetOSVersion
@@ -135,21 +157,38 @@ function GetDistro {
 }
 
 GetDistro
-echo $DISTRO
+echo "The system version is $DISTRO "
 
 # Warn users who aren't on an explicitly supported distro, but allow them to
 # override check and attempt installation with ``FORCE=yes ./install.bash``
-if [[ ! ${DISTRO} =~ (precise|rhel6|rhel7) ]]; then
+if [[ ! ${DISTRO} =~ (precise|trusty|rhel6|rhel7) ]]; then
     echo "WARNING: this script has not been tested on $DISTRO"
     if [[ "$FORCE" != "yes" ]]; then
         die $LINENO "If you wish to run this script anyway run with FORCE=yes"
     fi
 fi
 
+if [[ ! `lsof -Pi :25 -sTCP:LISTEN`  ]];then
+    echo "System didn't install SMTP Server! Please install and configure it manually !"
+    exit 1
+fi
+
+
+if [[  $DISTRO == "rhel7" ]];then
+    rpm -iUvh http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-5.noarch.rpm 
+    yum makecache
+fi
+
 if [[  $DISTRO == "rhel6" || $DISTRO == "rhel7"  ]]; then
     install_package "yum"
-elif [[ $DISTRO == "precise" ]]; then
+    if [[ ! `rpm -qa mysql*client` ]];then
+        yum install -y mysql
+    fi
+elif [[ $DISTRO =~ (precise|trusty) ]]; then
     install_package "apt-get"
+    if [[ ! `dpkg -l | grep mysql-client` ]];then
+       apt-get install -y mysql-client
+    fi
 fi
 
 if [[ $DISTRO == "rhel6" ]];then
@@ -157,6 +196,7 @@ if [[ $DISTRO == "rhel6" ]];then
     yum install -y wget
     wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
 fi
+
 
 PYV=`python -c "import sys;t='{v[0]}.{v[1]}'.format(v=list(sys.version_info[:2]));sys.stdout.write(t)";`
 if [[ $PYV == "2.6"  ]];then

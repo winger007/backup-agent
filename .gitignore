@@ -2,4 +2,7 @@
 *.pyc
 *.swo
 *.swn
+*.patch
+*.rej
+*.orig
 log/
