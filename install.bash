@@ -152,6 +152,12 @@ elif [[ $DISTRO == "precise" ]]; then
     install_package "apt-get"
 fi
 
+if [[ $DISTRO == "rhel6" ]];then
+    pip install --upgrade distribute
+    yum install -y wget
+    wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
+fi
+
 PYV=`python -c "import sys;t='{v[0]}.{v[1]}'.format(v=list(sys.version_info[:2]));sys.stdout.write(t)";`
 if [[ $PYV == "2.6"  ]];then
     echo "Will add one module to python library"
