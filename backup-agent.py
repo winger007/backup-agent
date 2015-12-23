@@ -19,7 +19,7 @@ import pdb
 mail_content = TemporaryFile()
 logger = None
 # Setup global logger
-logger_dir=os.getcwd() + "/log/"
+logger_dir=os.path.dirname(os.path.realpath(__file__)) + "/log/"
 if not os.path.exists(logger_dir):
     os.makedirs(logger_dir)
 

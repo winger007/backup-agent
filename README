@@ -1,10 +1,18 @@
-This tool is used to backup the database or file-system on client machine.
+About:
+This tool is used to backup the database or file-system to
+cloud from client machine automatically
 
+Features:
+1. Install this agent automatically based on different distribution
+2. Keep customized number of backup files on local and cloud
+3. Send notification mail to admin about backup result
+
+How to use:
 1. Run install script:
 -----------------------
 |bash install.bash     |      
 -----------------------
-To deploy this project, we need to use cron to set the daily task schedule,
+
 2. Use "crontab -e" to fill in below content.Below config means you want to backup the database
    at 1:00 every night.
 -------------------------------------------------
@@ -19,5 +27,4 @@ The $PROJECT_DIR is the tool location.
 | python $PROJECT_DIR/backup-agent.py |
 --------------------------------------
 
-Any problem, please contact Mei Lei <meil@rc.inesa.com>
-
+Any problem, please contact Mei Lei <meilei007@gmail.com>
